@@ -5,6 +5,12 @@
 local.settings.json
 test
 getting_started.md
+*.md
+README*
 node_modules/@types/
 node_modules/azure-functions-core-tools/
 node_modules/typescript/
+node_modules/.prisma/client/libquery_engine-darwin*
+node_modules/*/examples/
+node_modules/*/docs/
+node_modules/*/test/

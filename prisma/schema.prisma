@@ -1,0 +1,128 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model spreadsheet_generation_queue {
+  queue_id      Int       @id(map: "PK_queue") @default(autoincrement())
+  set_id        Int
+  priority      Int       @default(5)
+  status        String    @default("pending") @db.VarChar(50)
+  queued_at     DateTime  @default(now()) @db.DateTime
+  started_at    DateTime? @db.DateTime
+  completed_at  DateTime? @db.DateTime
+  error_message String?   @db.NVarChar(Max)
+  retry_count   Int       @default(0)
+  set           set       @relation(fields: [set_id], references: [set_id], onDelete: NoAction, onUpdate: NoAction, map: "FK_queue_set")
+
+  @@index([status, priority, queued_at], map: "IX_queue_status_priority")
+}
+
+model set {
+  set_id                       Int                            @id(map: "PK_set")
+  name                         String?                        @db.NVarChar(Max)
+  year                         Int?
+  organization                 Int?
+  manufacturer                 Int?
+  created                      DateTime                       @default(now(), map: "DEFAULT_set_created") @db.DateTime
+  card_count                   Int?                           @default(0)
+  series_count                 Int?                           @default(0)
+  checklist_blob_url           String?                        @db.NVarChar(Max)
+  checklist_generated_at       DateTime?                      @db.DateTime
+  checklist_generation_status  String?                        @db.VarChar(50)
+  series                       series[]
+  spreadsheet_generation_queue spreadsheet_generation_queue[]
+}
+
+model series {
+  series_id         BigInt   @id(map: "PK_series")
+  name              String?  @db.NVarChar(Max)
+  set_id            Int?     @map("set")
+  card_count        Int      @default(0)
+  created           DateTime @default(now()) @db.DateTime
+  is_base           Boolean? @default(false)
+  parallel_of_series BigInt?
+  min_print_run     Int?
+  max_print_run     Int?
+  print_run_display String?  @db.NVarChar(50)
+  color_id          Int?     @map("color")
+  set               set?     @relation(fields: [set_id], references: [set_id], onDelete: NoAction, onUpdate: NoAction)
+  color             color?   @relation(fields: [color_id], references: [color_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([set_id], map: "IX_series_set")
+  @@index([color_id], map: "IX_series_color")
+}
+
+model card {
+  card_id          BigInt             @id(map: "PK_card")
+  sort_order       Int?
+  card_number      String?            @db.NVarChar(Max)
+  is_rookie        Boolean            @default(false)
+  is_autograph     Boolean            @default(false)
+  is_relic         Boolean            @default(false)
+  print_run        Int?
+  series           BigInt?
+  color_id         Int?               @map("color")
+  notes            String?            @db.NVarChar(Max)
+  created          DateTime           @default(now()) @db.DateTime
+  color            color?             @relation(fields: [color_id], references: [color_id], onDelete: NoAction, onUpdate: NoAction)
+  card_player_team card_player_team[]
+
+  @@index([series], map: "IX_card_series_optimized")
+}
+
+model card_player_team {
+  card_player_team_id BigInt       @id(map: "PK_card_player_team")
+  card_id             BigInt?      @map("card")
+  player_team_id      BigInt?      @map("player_team")
+  created             DateTime     @default(now()) @db.DateTime
+  card                card?        @relation(fields: [card_id], references: [card_id], onDelete: NoAction, onUpdate: NoAction)
+  player_team         player_team? @relation(fields: [player_team_id], references: [player_team_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([card_id, player_team_id], map: "idx_card_player_team")
+}
+
+model player_team {
+  player_team_id   BigInt             @id(map: "PK_player_team")
+  player_id        BigInt?            @map("player")
+  team_id          Int?               @map("team")
+  created          DateTime           @default(now()) @db.DateTime
+  card_player_team card_player_team[]
+  player           player?            @relation(fields: [player_id], references: [player_id], onDelete: NoAction, onUpdate: NoAction)
+  team             team?              @relation(fields: [team_id], references: [team_Id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([player_team_id, player_id], map: "idx_player_team")
+}
+
+model player {
+  player_id   BigInt        @id(map: "PK_player")
+  first_name  String?       @db.NVarChar(Max)
+  last_name   String?       @db.NVarChar(Max)
+  nick_name   String?       @db.NVarChar(Max)
+  created     DateTime?     @default(now()) @db.DateTime
+  player_team player_team[]
+}
+
+model team {
+  team_Id      Int           @id(map: "PK_team")
+  name         String?       @db.NVarChar(Max)
+  city         String?       @db.NVarChar(Max)
+  created      DateTime      @default(now()) @db.DateTime
+  player_team  player_team[]
+
+  @@map("team")
+}
+
+model color {
+  color_id  Int      @id(map: "PK_color")
+  name      String?  @db.NVarChar(Max)
+  hex_value String?  @db.NVarChar(Max)
+  created   DateTime @default(now()) @db.DateTime
+  card      card[]
+  series    series[]
+}
